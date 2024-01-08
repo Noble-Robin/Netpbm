@@ -1,7 +1,8 @@
-package main
+package struct
 
 type PBM struct{
     data [][]bool
-    width, height int
+    width int
+	height int
     magicNumber string
 }
