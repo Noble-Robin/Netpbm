@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
+	"strconv"
 )
 
 type PBM struct {
-	Data          [][]bool
+	Data  [][]bool
 	Width, Height int
 	MagicNumber   string
 }
@@ -30,6 +30,10 @@ func ReadPBM(filename string) (*PBM, error) {
 	}
 	pbm.MagicNumber = scanner.Text()
 
+	if pbm.MagicNumber != "P1" && pbm.MagicNumber != "P4" {
+		return nil, fmt.Errorf("pas le bon format: %s", pbm.MagicNumber)
+	}
+
 	if !scanner.Scan() {
 		return nil, fmt.Errorf("peu pas lire les dimention")
 	}
@@ -42,6 +46,10 @@ func ReadPBM(filename string) (*PBM, error) {
 		fmt.Sscanf(a, "%d %d", &pbm.Width, &pbm.Height)
 		break
 
+	}
+
+	if pbm.MagicNumber == "P4" {
+		pbm.Width *= 8
 	}
 
 	for scanner.Scan() {
@@ -77,10 +85,10 @@ func ReadPBM(filename string) (*PBM, error) {
 					binaryBits = append(binaryBits, binaryDigits...)
 				}
 
-				if i >= pbm.Width {
+				if i >= pbm.Width  {
 					break
 				}
-				for _, value := range binaryBits {
+				for _, value := range binaryBits  {
 					if value == "1" {
 						row[i] = true
 						i++
@@ -99,7 +107,7 @@ func ReadPBM(filename string) (*PBM, error) {
 }
 
 func main() {
-	pbm, err := ReadPBM("test.pbm")
+	pbm, err := ReadPBM("testP4.pbm")
 	if err != nil {
 		fmt.Println("impossible de lire le fichier", err)
 		return
