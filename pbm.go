@@ -112,7 +112,9 @@ func (pbm *PBM) At(x, y int) bool {
 	return pbm.Data[x][y]
 }
 func (pbm *PBM) Set(x, y int, value bool) {
+	if x >= 0 && x < len(pbm.Data) && y >= 0 && y < len(pbm.Data[0]) {
 	pbm.Data[x][y] = value
+	}
 }
 func (pbm *PBM) Save(filename string) error {
 	fileName := "save.pbm"
@@ -139,6 +141,21 @@ func (pbm *PBM) Save(filename string) error {
 	fmt.Printf("File created: %s\n", fileName)
 	return nil
 }
+func (pbm *PBM) Flip() {
+	for x := 0; x < pbm.Height; x++ {
+		for i, j := 0, pbm.Width-1; i < j; i, j = i+1, j-1 {
+			pbm.Data[x][i], pbm.Data[x][j] = pbm.Data[x][j], pbm.Data[x][i]
+		}
+	}
+}
+
+func (pbm *PBM) Flop() {
+	for y := 0; y < pbm.Width; y++ {
+		for i, j := 0, pbm.Height-1; i < j; i, j = i+1, j-1 {
+			pbm.Data[i][y], pbm.Data[j][y] = pbm.Data[j][y], pbm.Data[i][y]
+		}
+	}
+}
 
 func main() {
 	filename := "testP4.pbm"
@@ -147,10 +164,27 @@ func main() {
 		fmt.Println("impossible de lire le fichier", err)
 		return
 	}
+	// pbm.Set(pbm.Width,pbm.Height,true)
+	
+	// pbm.Flop()
+	// pbm.Flip()
 	fmt.Println("Width:", pbm.Width)
 	fmt.Println("Height:", pbm.Height)
 	fmt.Println("Magic Number:", pbm.MagicNumber)
-	fmt.Println("Data:", pbm.Data)
-	fmt.Println(pbm.Save(filename))
-	fmt.Println(pbm.Save(pbm.Set()))
+	for x := 0; x < pbm.Height; x++ {
+		fmt.Println()			
+		for y := 0; y < pbm.Width; y++ {
+			if pbm.Data[x][y] == true {
+				fmt.Print("□")
+			} else {
+				fmt.Print("■")
+			}
+			
+
+		}
+	}
+	// fmt.Println("Data:", pbm.Data)
+	pbm.Save(filename)
+	// fmt.Println(pbm.At(pbm.Width,pbm.Height))
+	
 }
