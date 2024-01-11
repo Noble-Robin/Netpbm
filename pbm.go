@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type PBM struct {
-	Data  [][]bool
+	Data          [][]bool
 	Width, Height int
 	MagicNumber   string
 }
@@ -85,10 +85,10 @@ func ReadPBM(filename string) (*PBM, error) {
 					binaryBits = append(binaryBits, binaryDigits...)
 				}
 
-				if i >= pbm.Width  {
+				if i >= pbm.Width {
 					break
 				}
-				for _, value := range binaryBits  {
+				for _, value := range binaryBits {
 					if value == "1" {
 						row[i] = true
 						i++
@@ -105,9 +105,44 @@ func ReadPBM(filename string) (*PBM, error) {
 	}
 	return &pbm, nil
 }
+func (pbm *PBM) Size() (int, int) {
+	return pbm.Width, pbm.Height
+}
+func (pbm *PBM) At(x, y int) bool {
+	return pbm.Data[x][y]
+}
+func (pbm *PBM) Set(x, y int, value bool) {
+	pbm.Data[x][y] = value
+}
+func (pbm *PBM) Save(filename string) error {
+	fileName := "save.pbm"
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer file.Close()
+
+	fmt.Fprintf(file, "%s\n", pbm.MagicNumber)
+	fmt.Fprintf(file, "# saved file\n")
+	fmt.Fprintf(file, "%d %d\n", pbm.Width, pbm.Height)
+	for _, row := range pbm.Data {
+		for _, pixel := range row {
+			if pixel {
+				fmt.Fprint(file, "1")
+			} else {
+				fmt.Fprint(file, "0")
+			}
+		}
+		fmt.Fprintln(file)
+	}
+
+	fmt.Printf("File created: %s\n", fileName)
+	return nil
+}
 
 func main() {
-	pbm, err := ReadPBM("testP4.pbm")
+	filename := "testP4.pbm"
+	pbm, err := ReadPBM(filename)
 	if err != nil {
 		fmt.Println("impossible de lire le fichier", err)
 		return
@@ -116,4 +151,6 @@ func main() {
 	fmt.Println("Height:", pbm.Height)
 	fmt.Println("Magic Number:", pbm.MagicNumber)
 	fmt.Println("Data:", pbm.Data)
+	fmt.Println(pbm.Save(filename))
+	fmt.Println(pbm.Save(pbm.Set()))
 }
