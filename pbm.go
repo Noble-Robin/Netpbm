@@ -141,6 +141,13 @@ func (pbm *PBM) Save(filename string) error {
 	fmt.Printf("File created: %s\n", fileName)
 	return nil
 }
+func (pbm *PBM) Invert() {	
+	for i := 0; i < pbm.Height; i++ {		
+		for j := 0; j < pbm.Width; j++ {			
+			pbm.Data[i][j] = !pbm.Data[i][j]
+		}
+	}
+}
 func (pbm *PBM) Flip() {
 	for x := 0; x < pbm.Height; x++ {
 		for i, j := 0, pbm.Width-1; i < j; i, j = i+1, j-1 {
@@ -148,7 +155,6 @@ func (pbm *PBM) Flip() {
 		}
 	}
 }
-
 func (pbm *PBM) Flop() {
 	for y := 0; y < pbm.Width; y++ {
 		for i, j := 0, pbm.Height-1; i < j; i, j = i+1, j-1 {
@@ -156,7 +162,6 @@ func (pbm *PBM) Flop() {
 		}
 	}
 }
-
 func main() {
 	filename := "testP4.pbm"
 	pbm, err := ReadPBM(filename)
@@ -168,6 +173,7 @@ func main() {
 	
 	// pbm.Flop()
 	// pbm.Flip()
+	pbm.Invert()
 	fmt.Println("Width:", pbm.Width)
 	fmt.Println("Height:", pbm.Height)
 	fmt.Println("Magic Number:", pbm.MagicNumber)
@@ -183,8 +189,7 @@ func main() {
 
 		}
 	}
+	fmt.Println()
 	// fmt.Println("Data:", pbm.Data)
 	pbm.Save(filename)
-	// fmt.Println(pbm.At(pbm.Width,pbm.Height))
-	
 }
