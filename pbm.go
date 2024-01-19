@@ -15,96 +15,62 @@ type PBM struct {
 }
 
 func ReadPBM(filename string) (*PBM, error) {
+	var dimension string
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-
 	scanner := bufio.NewScanner(file)
-
 	var pbm PBM
 
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("peu pas lire le magicnumber")
+	// Lecture de la première ligne pour obtenir le magic number
+	scanner.Scan()
+	line := scanner.Text()
+	line = strings.TrimSpace(line)
+	if line != "P1" && line != "P4" {
+		return nil, fmt.Errorf("Not a Portable Bitmap file: bad magic number %s", line)
 	}
-	pbm.MagicNumber = scanner.Text()
+	pbm.MagicNumber = line
 
-	if pbm.MagicNumber != "P1" && pbm.MagicNumber != "P4" {
-		return nil, fmt.Errorf("pas le bon format: %s", pbm.MagicNumber)
-	}
-
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("peu pas lire les dimention")
-	}
-
+	// Lecture des dimensions
 	for scanner.Scan() {
-		a := scanner.Text()
-		if len(a) > 0 && a[0] == '#' {
+		if scanner.Text()[0] == '#' {
 			continue
 		}
-		fmt.Sscanf(a, "%d %d", &pbm.Width, &pbm.Height)
 		break
 
 	}
 
-	if pbm.MagicNumber == "P4" {
-		pbm.Width *= 8
-	}
+	dimension = scanner.Text()
+	res := strings.Split(dimension, " ")
+	pbm.Height, _ = strconv.Atoi(res[0])
+	pbm.Width, _ = strconv.Atoi(res[1])
 
-	for scanner.Scan() {
-		var binaryBits []string
-		line := scanner.Text()
-		tokens := strings.Fields(line)
-		row := make([]bool, pbm.Width)
-
-		if pbm.MagicNumber == "P1" {
-			for i, token := range tokens {
-				if i >= pbm.Width {
-					break
-				}
-				if token == "1" {
-					row[i] = true
-				} else if token == "0" {
-					row[i] = false
-				} else {
-					return nil, fmt.Errorf("invalid character in data: %s", token)
+	// Lecture des données binaires
+	if pbm.MagicNumber == "P1" {
+		pbm.Data = make([][]bool, pbm.Height)
+		for i := range pbm.Data {
+			pbm.Data[i] = make([]bool, pbm.Width)
+		}
+		for i := 0; i < pbm.Height; i++ {
+			scanner.Scan()
+			line := scanner.Text()
+			hori := strings.Fields(line)
+			for j := 0; j < pbm.Width; j++ {
+				verti, _ := strconv.Atoi(hori[j])
+				if verti == 1 {
+					pbm.Data[i][j] = true
 				}
 			}
 		}
-		if pbm.MagicNumber == "P4" {
-			i := 0
-			for _, token := range tokens {
-				token = strings.TrimPrefix(token, "0x")
-				for _, digit := range token {
-					digitValue, err := strconv.ParseUint(string(digit), 16, 4)
-					if err != nil {
-						return nil, err
-					}
-					binaryDigits := strings.Split(fmt.Sprintf("%04b", digitValue), "")
-					binaryBits = append(binaryBits, binaryDigits...)
-				}
 
-				if i >= pbm.Width {
-					break
-				}
-				for _, value := range binaryBits {
-					if value == "1" {
-						row[i] = true
-						i++
-					} else if value == "0" {
-						row[i] = false
-						i++
-					} else {
-						return nil, fmt.Errorf("invalid character in data: %v", value)
-					}
-				}
-			}
-		}
-		pbm.Data = append(pbm.Data, row)
 	}
+	// if pbm.MagicNumber =="P4"
+	fmt.Printf("%+v\n", PBM{pbm.Data, pbm.Width, pbm.Height, pbm.MagicNumber})
 	return &pbm, nil
 }
+
 func (pbm *PBM) Size() (int, int) {
 	return pbm.Width, pbm.Height
 }
@@ -113,7 +79,7 @@ func (pbm *PBM) At(x, y int) bool {
 }
 func (pbm *PBM) Set(x, y int, value bool) {
 	if x >= 0 && x < len(pbm.Data) && y >= 0 && y < len(pbm.Data[0]) {
-	pbm.Data[x][y] = value
+		pbm.Data[x][y] = value
 	}
 }
 func (pbm *PBM) Save(filename string) error {
@@ -130,9 +96,10 @@ func (pbm *PBM) Save(filename string) error {
 	for _, row := range pbm.Data {
 		for _, pixel := range row {
 			if pixel {
-				fmt.Fprint(file, "1")
+				fmt.Fprint(file, "1 ")
+
 			} else {
-				fmt.Fprint(file, "0")
+				fmt.Fprint(file, "0 ")
 			}
 		}
 		fmt.Fprintln(file)
@@ -141,9 +108,9 @@ func (pbm *PBM) Save(filename string) error {
 	fmt.Printf("File created: %s\n", fileName)
 	return nil
 }
-func (pbm *PBM) Invert() {	
-	for i := 0; i < pbm.Height; i++ {		
-		for j := 0; j < pbm.Width; j++ {			
+func (pbm *PBM) Invert() {
+	for i := 0; i < pbm.Height; i++ {
+		for j := 0; j < pbm.Width; j++ {
 			pbm.Data[i][j] = !pbm.Data[i][j]
 		}
 	}
@@ -161,35 +128,4 @@ func (pbm *PBM) Flop() {
 			pbm.Data[i][y], pbm.Data[j][y] = pbm.Data[j][y], pbm.Data[i][y]
 		}
 	}
-}
-func main() {
-	filename := "testP4.pbm"
-	pbm, err := ReadPBM(filename)
-	if err != nil {
-		fmt.Println("impossible de lire le fichier", err)
-		return
-	}
-	// pbm.Set(pbm.Width,pbm.Height,true)
-	
-	// pbm.Flop()
-	// pbm.Flip()
-	pbm.Invert()
-	fmt.Println("Width:", pbm.Width)
-	fmt.Println("Height:", pbm.Height)
-	fmt.Println("Magic Number:", pbm.MagicNumber)
-	for x := 0; x < pbm.Height; x++ {
-		fmt.Println()			
-		for y := 0; y < pbm.Width; y++ {
-			if pbm.Data[x][y] == true {
-				fmt.Print("□")
-			} else {
-				fmt.Print("■")
-			}
-			
-
-		}
-	}
-	fmt.Println()
-	// fmt.Println("Data:", pbm.Data)
-	pbm.Save(filename)
 }

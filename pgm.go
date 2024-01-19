@@ -12,102 +12,80 @@ type PGM struct {
 	Data          [][]uint8
 	Width, Height int
 	MagicNumber   string
-	Max           int
+	Max           uint
+}
+type PBM struct {
+	Data          [][]bool
+	Width, Height int
+	MagicNumber   string
 }
 
+
 func ReadPGM(filename string) (*PGM, error) {
+	var dimension string
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-
 	scanner := bufio.NewScanner(file)
-
 	var pgm PGM
 
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("peu pas lire le magicnumber")
+	// Lecture de la première ligne pour obtenir le magic number
+	scanner.Scan()
+	line := scanner.Text()
+	line = strings.TrimSpace(line)
+	if line != "P2" && line != "P5" {
+		return nil, fmt.Errorf("Not a Portable Bitmap file: bad magic number %s", line)
 	}
-	pgm.MagicNumber = scanner.Text()
+	pgm.MagicNumber = line
 
-	if pgm.MagicNumber != "P1" && pgm.MagicNumber != "P4" {
-		return nil, fmt.Errorf("pas le bon format: %s", pgm.MagicNumber)
-	}
-
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("peu pas lire les dimention")
-	}
-
+	// Lecture des dimensions
 	for scanner.Scan() {
-		a := scanner.Text()
-		if len(a) > 0 && a[0] == '#' {
+		if scanner.Text()[0] == '#' {
 			continue
 		}
-		fmt.Sscanf(a, "%d %d", &pgm.Width, &pgm.Height)
 		break
 
 	}
-	pgm.Max, err := strconv.Atoi(scanner.Text())
+
+	dimension = scanner.Text()
+	res := strings.Split(dimension, " ")
+	pgm.Height, _ = strconv.Atoi(res[0])
+	pgm.Width, _ = strconv.Atoi(res[1])
+
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("unable to read max value")
+	}
+	maxValue, err := strconv.Atoi(scanner.Text())
 	if err != nil {
-		return nil, fmt.Errorf("invalid max value")
+		return nil, fmt.Errorf("failed to parse max value: %v", err)
 	}
-	if pgm.MagicNumber == "P4" {
-		pgm.Width *= 8
-	}
+	pgm.Max = uint(maxValue)
 
 	for scanner.Scan() {
-		var binaryBits []uint8
 		line := scanner.Text()
 		tokens := strings.Fields(line)
 		row := make([]uint8, pgm.Width)
-
-		if pgm.MagicNumber == "P2" {
-			for i, token := range tokens {
-				if i >= pgm.Width {
-					break
-				}
-				if token == "1" {
-					row[i] = true
-				} else if token == "0" {
-					row[i] = false
-				} else {
-					return nil, fmt.Errorf("invalid character in data: %s", token)
-				}
+		for i, token := range tokens {
+			if i >= pgm.Width {
+				break
 			}
-		}
-		if pgm.MagicNumber == "P2" {
-			i := 0
-			for _, token := range tokens {
-				token = strings.TrimPrefix(token, "0x")
-				for _, digit := range token {
-					digitValue, err := strconv.ParseUint(string(digit), 16, 4)
-					if err != nil {
-						return nil, err
-					}
-					binaryDigits := strings.Split(fmt.Sprintf("%04b", digitValue), "")
-					binaryBits = append(binaryBits, binaryDigits...)
-				}
-
-				if i >= pgm.Width {
-					break
-				}
-				for _, value := range binaryBits {
-					if value == "1" {
-						row[i] = true
-						i++
-					} else if value == "0" {
-						row[i] = false
-						i++
-					} else {
-						return nil, fmt.Errorf("invalid character in data: %v", value)
-					}
-				}
+			value, err := strconv.ParseUint(token, 10, 8)
+			if err != nil {
+				return nil, fmt.Errorf("caractère non valide dans les données : %s", token)
 			}
+			row[i] = uint8(value)
 		}
 		pgm.Data = append(pgm.Data, row)
 	}
-	return &pgm, nil
+	return &PGM{
+		Data:        pgm.Data,
+		Width:       pgm.Width,
+		Height:      pgm.Height,
+		MagicNumber: pgm.MagicNumber,
+		Max:         pgm.Max,
+	}, nil
 }
 func (pgm *PGM) Size() (int, int) {
 	return pgm.Width, pgm.Height
@@ -121,35 +99,38 @@ func (pgm *PGM) Set(x, y int, value uint8) {
 	}
 }
 func (pgm *PGM) Save(filename string) error {
-	fileName := "save.pgm"
-	file, err := os.Create(fileName)
+	file, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("error creating file: %v", err)
+		return err
 	}
 	defer file.Close()
 
-	fmt.Fprintf(file, "%s\n", pgm.MagicNumber)
-	fmt.Fprintf(file, "# saved file\n")
-	fmt.Fprintf(file, "%d %d\n", pgm.Width, pgm.Height)
-	
-	for _, row := range pgm.Data {
-		for _, pixel := range row {
-			if pixel {
-				fmt.Fprint(file, "1")
-			} else {
-				fmt.Fprint(file, "0")
-			}
-		}
-		fmt.Fprintln(file)
+	header := fmt.Sprintf("%s\n%d %d\n%d\n", pgm.MagicNumber, pgm.Width, pgm.Height, pgm.Max)
+	_, err = file.WriteString(header)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("File created: %s\n", fileName)
+	for _, row := range pgm.Data {
+		for _, value := range row {
+			_, err := fmt.Fprintf(file, "%d ", value)
+			if err != nil {
+				return err
+			}
+		}
+		_, err := file.WriteString("\n")
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
+
 func (pgm *PGM) Invert() {
 	for i := 0; i < pgm.Height; i++ {
 		for j := 0; j < pgm.Width; j++ {
-			pgm.Data[i][j] = ^pgm.Data[i][j]
+			pgm.Data[i][j] = uint8(pgm.Max) - pgm.Data[i][j]
 		}
 	}
 }
@@ -167,43 +148,39 @@ func (pgm *PGM) Flop() {
 		}
 	}
 }
+
 func (pgm *PGM) SetMaxValue(maxValue uint8) {
-    pgm.Max = int(maxValue)
+	pgm.Max = uint(maxValue)
 }
 func (pgm *PGM) Rotate90CW() {
-    rotatedData := make([][]uint8, pgm.Width)
-    for i := range rotatedData {
-        rotatedData[i] = make([]uint8, pgm.Height)
-    }
-    for i := 0; i < pgm.Height; i++ {
-        for j := 0; j < pgm.Width; j++ {
-            rotatedData[j][pgm.Height-1-i] = pgm.Data[i][j]
-        }
-    }
-    pgm.Data = rotatedData
-    pgm.Width, pgm.Height = pgm.Height, pgm.Width
+	rotatedData := make([][]uint8, pgm.Width)
+	for i := range rotatedData {
+		rotatedData[i] = make([]uint8, pgm.Height)
+	}
+	for i := 0; i < pgm.Height; i++ {
+		for j := 0; j < pgm.Width; j++ {
+			rotatedData[j][pgm.Height-1-i] = pgm.Data[i][j]
+		}
+	}
+	pgm.Data = rotatedData
+	pgm.Width, pgm.Height = pgm.Height, pgm.Width
 }
 func (pgm *PGM) ToPBM() *PBM {
-    // Set a threshold value for conversion (adjust as needed)
-    threshold := uint8(pgm.Max / 2)
-
-    pbm := &PBM{
+    threshold := uint8(pgm.Max / 2) // Use midpoint as threshold
+    pbmImage := &PBM{
         Width:       pgm.Width,
         Height:      pgm.Height,
         MagicNumber: "P1",
     }
+    pbmImage.Data = make([][]bool, pbmImage.Height)
+    for i := 0; i < pbmImage.Height; i++ {
+        pbmImage.Data[i] = make([]bool, pbmImage.Width)
+    }
     for i := 0; i < pgm.Height; i++ {
-        var row []bool
         for j := 0; j < pgm.Width; j++ {
-            pixel := pgm.Data[i][j]
-            if pixel > threshold {
-                row = append(row, true)
-            } else {
-                row = append(row, false)
-            }
+            pbmImage.Data[i][j] = pgm.Data[i][j] > threshold
         }
-        pbm.Data = append(pbm.Data, row)
     }
 
-    return pbm
+    return pbmImage
 }
